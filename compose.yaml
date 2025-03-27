@@ -17,7 +17,7 @@ services:
 
   adminer:
     image: adminer:latest
-    container_name: confidentiality_adminer
+    container_name: adminer
     restart: always
     depends_on:
       - postgres

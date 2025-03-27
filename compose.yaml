@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:17.4
+    container_name: confidentiality_system_db
+    restart: always
+    environment:
+      POSTGRES_DB: confidentiality_system
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    ports:
+      - "5432:5432"
+    volumes:
+      # The named volume to persist data
+      - pgdata:/var/lib/postgresql/data
+      # Mount init.sql file so Postgres runs it on first startup
+      - ./internal/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  adminer:
+    image: adminer:latest
+    container_name: confidentiality_adminer
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

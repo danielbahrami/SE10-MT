@@ -22,5 +22,18 @@ services:
     ports:
       - "8080:8080"
 
+  neo4j:
+    image: neo4j:2025.03.0
+    container_name: neo4j_db
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/mypassword
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    volumes:
+      - neo4j_data:/data
+
 volumes:
   postgres_data:
+  neo4j_data:

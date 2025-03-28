@@ -10,9 +10,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      # The named volume to persist data
       - postgres_data:/data
-      # Mount init.sql file so Postgres runs it on first startup
       - ./internal/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   adminer:

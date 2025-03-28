@@ -1,4 +1,28 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: ./cmd/confidentiality_system/Dockerfile
+    container_name: go_app
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - neo4j
+      - redis
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: confidentiality_system
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      NEO4J_HOST: neo4j
+      NEO4J_PORT: "7687"
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: mypassword
+      REDIS_ADDR: redis:6379
+    ports:
+      - "9090:9090"
+
   postgres:
     image: postgres:17.4
     container_name: postgres_db

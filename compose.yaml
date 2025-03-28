@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:17.4
     container_name: postgres_db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: confidentiality_system
       POSTGRES_USER: myuser
@@ -18,7 +18,7 @@ services:
   adminer:
     image: adminer:latest
     container_name: adminer
-    restart: always
+    restart: unless-stopped
     depends_on:
       - postgres
     ports:

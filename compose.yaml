@@ -34,6 +34,18 @@ services:
     volumes:
       - neo4j_data:/data
 
+  redis:
+    image: redis:7.4.2
+    container_name: redis_db
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
   neo4j_data:
+  redis_data:

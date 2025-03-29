@@ -5,9 +5,9 @@ WORKDIR /app
 COPY ../../go.mod ../../go.sum ./
 RUN go mod download
 
-COPY cmd/confidentiality_system/*.go ./
+COPY ../../. ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /confidentiality-system
+RUN CGO_ENABLED=0 GOOS=linux go build -o /confidentiality-system ./cmd/confidentiality_system
 
 EXPOSE 9090
 

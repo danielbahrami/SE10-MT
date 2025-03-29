@@ -11,6 +11,7 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     org_id INT NOT NULL REFERENCES organizations(id),
     name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
     hashed_bearer_token TEXT NOT NULL,
     override_permissions JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

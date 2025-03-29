@@ -8,15 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func ConnectPostgres() {
+func ConnectPostgres() (*pgxpool.Pool, error) {
 	DATABASE_URL := "postgres://" + os.Getenv("POSTGRES_USER") + ":" + os.Getenv("POSTGRES_PASSWORD") + "@" +
 		os.Getenv("POSTGRES_HOST") + ":" + os.Getenv("POSTGRES_PORT") + "/" + os.Getenv("POSTGRES_DB")
 	fmt.Println("DATABASE_URL: " + DATABASE_URL)
 
 	dbpool, err := pgxpool.New(context.Background(), DATABASE_URL)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to create connection pool: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
-	defer dbpool.Close()
+	return dbpool, nil
 }

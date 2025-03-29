@@ -2,13 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 )
 
 func main() {
-	postgres.ConnectPostgres()
+	dbpool, err := postgres.ConnectPostgres()
+	if err != nil {
+		log.Fatalf("Error connecting to Postgres: %v", err)
+	}
+	defer dbpool.Close()
 
 	i := 1
 	for {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,4 +19,26 @@ func ConnectPostgres() (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
 	return dbpool, nil
+}
+
+func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*User, error) {
+	query := `
+        SELECT id, org_id, name, email, hashed_bearer_token, override_permissions, created_at, updated_at FROM users WHERE email = $1
+	`
+	row := dbpool.QueryRow(ctx, query, email)
+
+	var u User
+	err := row.Scan(&u.ID, &u.OrgID, &u.Name, &u.Email, &u.HashedBearerToken, &u.OverridePermissions, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("GetUserByEmail: %w", err)
+	}
+	return &u, nil
+}
+
+func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userID int, query, decision, rewrittenQuery string) error {
+	sql := `
+        INSERT INTO logs (user_id, query, decision, rewritten_query, created_at) VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := dbpool.Exec(ctx, sql, userID, query, decision, rewrittenQuery, time.Now())
+	return err
 }

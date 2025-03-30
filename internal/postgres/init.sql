@@ -27,7 +27,7 @@ CREATE TABLE logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Trigger function to update the updated_at column
+-- Trigger function to update updated_at column
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -36,13 +36,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Attach triggers to the organizations table
+-- Attach trigger to organizations table
 CREATE TRIGGER update_organizations_updated_at
 BEFORE UPDATE ON organizations
 FOR EACH ROW
 EXECUTE PROCEDURE update_updated_at_column();
 
--- Attach triggers to the users table
+-- Attach trigger to users table
 CREATE TRIGGER update_users_updated_at
 BEFORE UPDATE ON users
 FOR EACH ROW

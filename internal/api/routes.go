@@ -7,6 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type Request struct {
+	Cypher string `json:"cypher"`
+}
+
 func SetupRoutes(router *gin.Engine, dbpool *pgxpool.Pool) {
 	// Health endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -23,9 +27,8 @@ func SetupRoutes(router *gin.Engine, dbpool *pgxpool.Pool) {
 		}
 
 		// User is now authenticated
-		var req struct {
-			Cypher string `json:"cypher"`
-		}
+
+		var req Request
 
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})

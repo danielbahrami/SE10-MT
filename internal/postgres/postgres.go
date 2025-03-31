@@ -35,6 +35,20 @@ func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*U
 	return &user, nil
 }
 
+func GetOrganizationById(ctx context.Context, dbpool *pgxpool.Pool, id int) (*Organization, error) {
+	sql := `
+        SELECT id, name, default_permissions, created_at, updated_at FROM organizations WHERE id = $1
+	`
+	row := dbpool.QueryRow(ctx, sql, id)
+
+	var org Organization
+	err := row.Scan(&org.ID, &org.Name, &org.DefaultPermissions, &org.CreatedAt, &org.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("GetOrganizationById: %w", err)
+	}
+	return &org, nil
+}
+
 func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userId int, query, decision, rewrittenQuery string) error {
 	sql := `
         INSERT INTO logs (user_id, query, decision, rewritten_query, created_at) VALUES ($1, $2, $3, $4, $5)

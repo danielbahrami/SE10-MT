@@ -22,10 +22,10 @@ func ConnectPostgres() (*pgxpool.Pool, error) {
 }
 
 func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*User, error) {
-	query := `
+	sql := `
         SELECT id, org_id, name, email, hashed_bearer_token, override_permissions, created_at, updated_at FROM users WHERE email = $1
 	`
-	row := dbpool.QueryRow(ctx, query, email)
+	row := dbpool.QueryRow(ctx, sql, email)
 
 	var user User
 	err := row.Scan(&user.ID, &user.OrgID, &user.Name, &user.Email, &user.HashedBearerToken, &user.OverridePermissions, &user.CreatedAt, &user.UpdatedAt)
@@ -35,10 +35,10 @@ func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*U
 	return &user, nil
 }
 
-func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userID int, query, decision, rewrittenQuery string) error {
+func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userId int, query, decision, rewrittenQuery string) error {
 	sql := `
         INSERT INTO logs (user_id, query, decision, rewritten_query, created_at) VALUES ($1, $2, $3, $4, $5)
 	`
-	_, err := dbpool.Exec(ctx, sql, userID, query, decision, rewrittenQuery, time.Now())
+	_, err := dbpool.Exec(ctx, sql, userId, query, decision, rewrittenQuery, time.Now())
 	return err
 }

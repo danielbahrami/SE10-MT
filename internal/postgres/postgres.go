@@ -27,12 +27,12 @@ func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*U
 	`
 	row := dbpool.QueryRow(ctx, query, email)
 
-	var u User
-	err := row.Scan(&u.ID, &u.OrgID, &u.Name, &u.Email, &u.HashedBearerToken, &u.OverridePermissions, &u.CreatedAt, &u.UpdatedAt)
+	var user User
+	err := row.Scan(&user.ID, &user.OrgID, &user.Name, &user.Email, &user.HashedBearerToken, &user.OverridePermissions, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserByEmail: %w", err)
 	}
-	return &u, nil
+	return &user, nil
 }
 
 func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userID int, query, decision, rewrittenQuery string) error {

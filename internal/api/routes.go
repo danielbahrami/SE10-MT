@@ -41,7 +41,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&payload); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			http.Error(w, "Invalid payload format", http.StatusBadRequest)
 			return
 		}
 
@@ -50,6 +50,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 			return
 		}
 
+		// Retrieve user permissions
 		perm, err := postgres.GetUserPermissions(context.Background(), dbpool, user)
 		if err != nil {
 			http.Error(w, "Error retrieving user permissions", http.StatusInternalServerError)

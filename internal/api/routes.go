@@ -53,6 +53,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 		perm, err := postgres.GetUserPermissions(context.Background(), dbpool, user)
 		if err != nil {
 			http.Error(w, "Error retrieving user permissions", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")

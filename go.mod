@@ -1,6 +1,6 @@
 module github.com/danielbahrami/se10-mt
 
-go 1.24.1
+go 1.24.2
 
 require github.com/jackc/pgx/v5 v5.7.4
 

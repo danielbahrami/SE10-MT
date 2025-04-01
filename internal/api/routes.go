@@ -7,10 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Request struct {
-	Cypher string `json:"cypher"`
-}
-
 func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 	// Health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -36,15 +32,18 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 			return
 		}
 
-		// Decode JSON request body
-		var req Request
+		// Decode JSON payload body
+		var payload struct {
+			Cypher string `json:"cypher"`
+		}
+
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&req); err != nil {
+		if err := decoder.Decode(&payload); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		if req.Cypher == "" {
+		if payload.Cypher == "" {
 			http.Error(w, "The 'cypher' field is required", http.StatusBadRequest)
 			return
 		}
@@ -52,7 +51,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 		response := map[string]any{
 			"message": "User authenticated and query processed",
 			"user":    user.Email,
-			"cypher":  req.Cypher,
+			"cypher":  payload.Cypher,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

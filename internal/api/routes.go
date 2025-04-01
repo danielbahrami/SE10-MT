@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
+	"github.com/danielbahrami/se10-mt/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,13 +50,12 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 			return
 		}
 
-		response := map[string]any{
-			"message": "User authenticated and query processed",
-			"user":    user.Email,
-			"cypher":  payload.Cypher,
+		perm, err := postgres.GetUserPermissions(context.Background(), dbpool, user)
+		if err != nil {
+			http.Error(w, "Error retrieving user permissions", http.StatusInternalServerError)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		json.NewEncoder(w).Encode(perm)
 	})
 }

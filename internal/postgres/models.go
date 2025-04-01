@@ -24,6 +24,12 @@ type User struct {
 	UpdatedAt           time.Time
 }
 
+type Permissions struct {
+	AllowedLabels        []string            `json:"allowed_labels"`
+	AllowedRelationships []string            `json:"allowed_relationships"`
+	AllowedProperties    map[string][]string `json:"allowed_properties"`
+}
+
 type Log struct {
 	ID             int
 	UserID         int

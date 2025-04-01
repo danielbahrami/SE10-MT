@@ -50,7 +50,7 @@ func GetOrganizationById(ctx context.Context, dbpool *pgxpool.Pool, id int) (*Or
 	return &org, nil
 }
 
-func GetUserPermissions(ctx context.Context, dbpool *pgxpool.Pool, user *User, cypher string) (*Permissions, error) {
+func GetUserPermissions(ctx context.Context, dbpool *pgxpool.Pool, user *User) (*Permissions, error) {
 	var effectivePermissions string
 	if user.OverridePermissions.Valid && user.OverridePermissions.String != "" {
 		effectivePermissions = user.OverridePermissions.String

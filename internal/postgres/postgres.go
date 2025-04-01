@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -47,6 +48,24 @@ func GetOrganizationById(ctx context.Context, dbpool *pgxpool.Pool, id int) (*Or
 		return nil, fmt.Errorf("GetOrganizationById: %w", err)
 	}
 	return &org, nil
+}
+
+func GetUserPermissions(ctx context.Context, dbpool *pgxpool.Pool, user *User, cypher string) (*Permissions, error) {
+	var effectivePermissions string
+	if user.OverridePermissions.Valid && user.OverridePermissions.String != "" {
+		effectivePermissions = user.OverridePermissions.String
+	} else {
+		org, err := GetOrganizationById(ctx, dbpool, user.OrgID)
+		if err != nil {
+			return nil, fmt.Errorf("GetUserPermissions: %w", err)
+		}
+		effectivePermissions = org.DefaultPermissions
+	}
+	var permissions Permissions
+	if err := json.Unmarshal([]byte(effectivePermissions), &permissions); err != nil {
+		return nil, fmt.Errorf("GetUserPermissions: %w", err)
+	}
+	return &permissions, nil
 }
 
 func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userId int, query, decision, rewrittenQuery string) error {

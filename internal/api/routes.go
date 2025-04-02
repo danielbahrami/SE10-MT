@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
@@ -51,7 +50,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 		}
 
 		// Retrieve user permissions
-		perm, err := postgres.GetUserPermissions(context.Background(), dbpool, user)
+		perm, err := postgres.GetUserPermissions(r.Context(), dbpool, user)
 		if err != nil {
 			http.Error(w, "Error retrieving user permissions", http.StatusInternalServerError)
 			return

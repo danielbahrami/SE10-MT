@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -29,7 +28,7 @@ func AuthenticateUser(r *http.Request, dbpool *pgxpool.Pool) (*postgres.User, er
 
 	token := parts[1]
 
-	user, err := postgres.GetUserByEmail(context.Background(), dbpool, email)
+	user, err := postgres.GetUserByEmail(r.Context(), dbpool, email)
 	if err != nil {
 		return nil, fmt.Errorf("user not found")
 	}

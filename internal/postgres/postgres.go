@@ -19,6 +19,7 @@ func ConnectPostgres() (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
+
 	return dbpool, nil
 }
 
@@ -33,6 +34,7 @@ func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*U
 	if err != nil {
 		return nil, fmt.Errorf("GetUserByEmail: %w", err)
 	}
+
 	return &user, nil
 }
 
@@ -47,6 +49,7 @@ func GetOrganizationById(ctx context.Context, dbpool *pgxpool.Pool, id int) (*Or
 	if err != nil {
 		return nil, fmt.Errorf("GetOrganizationById: %w", err)
 	}
+
 	return &org, nil
 }
 
@@ -61,10 +64,12 @@ func GetUserPermissions(ctx context.Context, dbpool *pgxpool.Pool, user *User) (
 		}
 		effectivePermissions = org.DefaultPermissions
 	}
+
 	var permissions Permissions
 	if err := json.Unmarshal([]byte(effectivePermissions), &permissions); err != nil {
 		return nil, fmt.Errorf("GetUserPermissions: %w", err)
 	}
+
 	return &permissions, nil
 }
 
@@ -73,5 +78,6 @@ func LogQuery(ctx context.Context, dbpool *pgxpool.Pool, userId int, query, deci
         INSERT INTO logs (user_id, query, decision, rewritten_query, created_at) VALUES ($1, $2, $3, $4, $5)
 	`
 	_, err := dbpool.Exec(ctx, sql, userId, query, decision, rewrittenQuery, time.Now())
+
 	return err
 }

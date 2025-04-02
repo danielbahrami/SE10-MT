@@ -1,20 +1,31 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	"github.com/danielbahrami/se10-mt/internal/api"
+	"github.com/danielbahrami/se10-mt/internal/neo4j"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 )
 
 func main() {
+	ctx := context.Background()
+
 	// Connect to Postgres
 	dbpool, err := postgres.ConnectPostgres()
 	if err != nil {
 		log.Fatalf("Failed to connect to Postgres: %v", err)
 	}
 	defer dbpool.Close()
+
+	// Connect to Neo4j
+	driver, err := neo4j.ConnectNeo4j(ctx)
+	if err != nil {
+		log.Fatalf("Failed to connect to Neo4j: %v", err)
+	}
+	defer driver.Close(ctx)
 
 	// Create ServeMux
 	mux := http.NewServeMux()

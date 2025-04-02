@@ -17,11 +17,11 @@ func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth(dbUser, dbPassword, ""))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create neo4j driver: %w", err)
+		return nil, fmt.Errorf("Failed to create Neo4j driver: %w", err)
 	}
 
 	if err = driver.VerifyConnectivity(ctx); err != nil {
-		return nil, fmt.Errorf("unable to connect to neo4j: %w", err)
+		return nil, fmt.Errorf("Unable to connect to Neo4j: %w", err)
 	}
 
 	fmt.Println("Connected to Neo4j")

@@ -21,7 +21,7 @@ func ConnectPostgres() (*pgxpool.Pool, error) {
 
 	dbpool, err := pgxpool.New(context.Background(), DATABASE_URL)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create connection pool: %w", err)
+		return nil, fmt.Errorf("Unable to create connection pool: %w", err)
 	}
 
 	fmt.Println("Connected to Postgres")

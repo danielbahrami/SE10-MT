@@ -9,9 +9,11 @@ import (
 )
 
 func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
-	dbUri := os.Getenv("NEO4J_HOST")
+	dbHost := os.Getenv("NEO4J_HOST")
+	dbPort := os.Getenv("NEO4J_PORT")
 	dbUser := os.Getenv("NEO4J_USER")
 	dbPassword := os.Getenv("NEO4J_PASSWORD")
+	dbUri := fmt.Sprintf("bolt://%s:%s", dbHost, dbPort)
 
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth(dbUser, dbPassword, ""))
 	if err != nil {
@@ -22,5 +24,6 @@ func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 		return nil, fmt.Errorf("unable to connect to neo4j: %w", err)
 	}
 
+	fmt.Println("Connected to Neo4j")
 	return driver, nil
 }

@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/danielbahrami/se10-mt/internal/api"
-	"github.com/danielbahrami/se10-mt/internal/neo4j"
+	"github.com/danielbahrami/se10-mt/internal/graphdb"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 )
 
@@ -21,7 +21,7 @@ func main() {
 	defer dbpool.Close()
 
 	// Connect to Neo4j
-	driver, err := neo4j.ConnectNeo4j(ctx)
+	driver, err := graphdb.ConnectNeo4j(ctx)
 	if err != nil {
 		log.Fatalf("Failed to connect to Neo4j: %v", err)
 	}

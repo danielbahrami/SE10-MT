@@ -34,7 +34,7 @@ type Log struct {
 	ID             int
 	UserID         int
 	Query          string
-	Decision       string // Allowed, Blocked, Rewritten
+	Decision       string // "Allowed", "Blocked", or "Rewritten"
 	RewrittenQuery string
 	CreatedAt      time.Time
 }

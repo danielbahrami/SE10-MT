@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/danielbahrami/se10-mt/internal/analyzer"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
+func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *analyzer.Analyzer) {
 	// Health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -56,7 +57,15 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool) {
 			return
 		}
 
+		// Provide the Cypher query and the user's permissions to the analyzer
+		results, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
+		if err != nil {
+			http.Error(w, "Error analyzing query", http.StatusInternalServerError)
+			return
+		}
+
+		// Return the results to the client
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(perm)
+		json.NewEncoder(w).Encode(results)
 	})
 }

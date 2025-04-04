@@ -8,7 +8,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-type QueryResult map[string]any
+type QueryResult = map[string]any
 
 func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 	dbHost := os.Getenv("NEO4J_HOST")

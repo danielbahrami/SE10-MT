@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/danielbahrami/se10-mt/internal/analyzer"
 	"github.com/danielbahrami/se10-mt/internal/api"
 	"github.com/danielbahrami/se10-mt/internal/graphdb"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
@@ -27,11 +28,14 @@ func main() {
 	}
 	defer driver.Close(ctx)
 
+	// Create an Analyzer instance using dependency injection
+	analyzerInstance := analyzer.New(ctx, driver)
+
 	// Create ServeMux
 	mux := http.NewServeMux()
 
 	// Setup API routes
-	api.SetupRoutes(mux, dbpool)
+	api.SetupRoutes(mux, dbpool, analyzerInstance)
 
 	// Start the server on port 9090
 	if err := http.ListenAndServe(":9090", mux); err != nil {

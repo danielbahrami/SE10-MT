@@ -8,6 +8,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+type QueryResult map[string]any
+
 func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 	dbHost := os.Getenv("NEO4J_HOST")
 	dbPort := os.Getenv("NEO4J_PORT")
@@ -26,4 +28,31 @@ func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 
 	fmt.Println("Connected to Neo4j")
 	return driver, nil
+}
+
+func QueryHandler(
+	ctx context.Context,
+	driver neo4j.DriverWithContext,
+	cypher string,
+	parameters map[string]any) ([]QueryResult, error) {
+	result, err := neo4j.ExecuteQuery(ctx, driver,
+		cypher,
+		parameters,
+		neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("neo4j"))
+	if err != nil {
+		return nil, fmt.Errorf("QueryHandler failed: %w", err)
+	}
+
+	var records []QueryResult
+	for _, record := range result.Records {
+		records = append(records, record.AsMap())
+	}
+
+	fmt.Printf("The query `%v` returned %v records in %+v.\n",
+		result.Summary.Query().Text(),
+		len(result.Records),
+		result.Summary.ResultAvailableAfter())
+
+	return records, nil
 }

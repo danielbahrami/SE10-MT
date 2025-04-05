@@ -2,7 +2,7 @@
 CREATE TABLE organizations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
-    default_permissions JSONB,
+    default_permissions JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

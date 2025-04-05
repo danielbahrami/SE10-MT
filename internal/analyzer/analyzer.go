@@ -25,7 +25,7 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 
 	// Analysis here
 
-	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher, nil)
+	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to execute query: %w", err)
 	}

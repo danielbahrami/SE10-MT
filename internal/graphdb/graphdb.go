@@ -33,8 +33,8 @@ func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 func QueryHandler(
 	ctx context.Context,
 	driver neo4j.DriverWithContext,
-	cypher string,
-	parameters map[string]any) ([]QueryResult, error) {
+	cypher string) ([]QueryResult, error) {
+	parameters := map[string]any{}
 	result, err := neo4j.ExecuteQuery(ctx, driver,
 		cypher,
 		parameters,

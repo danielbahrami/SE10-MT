@@ -3,6 +3,7 @@ package graphdb
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -26,7 +27,7 @@ func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 		return nil, fmt.Errorf("Unable to connect to Neo4j: %w", err)
 	}
 
-	fmt.Println("Connected to Neo4j")
+	log.Println("Connected to Neo4j")
 	return driver, nil
 }
 
@@ -49,7 +50,7 @@ func QueryHandler(
 		records = append(records, record.AsMap())
 	}
 
-	fmt.Printf("The query `%v` returned %v records in %+v.\n",
+	log.Printf("The query `%v` returned %v records in %+v.\n",
 		result.Summary.Query().Text(),
 		len(result.Records),
 		result.Summary.ResultAvailableAfter())

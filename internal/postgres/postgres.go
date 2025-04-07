@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -24,7 +25,7 @@ func ConnectPostgres() (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("Unable to create connection pool: %w", err)
 	}
 
-	fmt.Println("Connected to Postgres")
+	log.Println("Connected to Postgres")
 	return dbpool, nil
 }
 

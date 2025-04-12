@@ -12,10 +12,16 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-// Analyzer encapsulates the context and Neo4j driver
+// Encapsulates the context and Neo4j driver
 type Analyzer struct {
 	ctx    context.Context
 	driver neo4j.DriverWithContext
+}
+
+// Holds the outcome of a query analysis
+type AnalysisResult struct {
+	Allowed    bool
+	Violations []string
 }
 
 // Creates a new Analyzer instance
@@ -23,10 +29,17 @@ func New(ctx context.Context, driver neo4j.DriverWithContext) *Analyzer {
 	return &Analyzer{ctx: ctx, driver: driver}
 }
 
-func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, error) {
-	log.Println("AnalyzeAndExecute called with query:", cypher)
+func (analyzer *Analyzer) AnalyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
+	log.Println("Analyzing the following query:", cypher)
+
+	analysis := &AnalysisResult{
+		Allowed:    true,
+		Violations: []string{},
+	}
 
 	// Node Label Check
+	initialViolations := len(analysis.Violations)
+
 	// Use regex that matches node definitions in parentheses
 	nodeLabelRegex := regexp.MustCompile(`\(\s*[A-Za-z0-9]*\s*:\s*([A-Za-z0-9_]+)`)
 	labelMatches := nodeLabelRegex.FindAllStringSubmatch(cypher, -1)
@@ -45,13 +58,19 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 		labelsFound[label] = true
 		if !allowedLabelSet[label] {
 			log.Printf("Label check failed: label '%s' is not allowed", match[1])
-			return nil, fmt.Errorf("Query contains disallowed label '%s'", match[1])
+			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed label '%s'", match[1]))
+			analysis.Allowed = false
 		}
 	}
 
-	log.Printf("Label check passed. Labels found: %+v\n", labelsFound)
+	if len(analysis.Violations) == initialViolations {
+		log.Printf("Label check passed. Labels found: %+v\n", labelsFound)
+	} else {
+		log.Printf("Label check completed with violations. Labels found: %+v\n", labelsFound)
+	}
 
 	// Relationship Check
+	initialViolations = len(analysis.Violations)
 	relRegex := regexp.MustCompile(`-\[\s*[^\]]*:\s*([A-Za-z0-9_]+)`)
 	relMatches := relRegex.FindAllStringSubmatch(cypher, -1)
 	allowedRelSet := make(map[string]bool)
@@ -68,13 +87,19 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 		relType := strings.ToLower(match[1])
 		if !allowedRelSet[relType] {
 			log.Printf("Relationship check failed: relationship type '%s' is not allowed", match[1])
-			return nil, fmt.Errorf("Query contains disallowed relationship type '%s'", match[1])
+			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed relationship type '%s'", match[1]))
+			analysis.Allowed = false
 		}
 	}
 
-	log.Printf("Relationship check passed\n")
+	if len(analysis.Violations) == initialViolations {
+		log.Println("Relationship check passed")
+	} else {
+		log.Println("Relationship check completed with violations")
+	}
 
 	// Property Check
+	initialViolations = len(analysis.Violations)
 	propRegex := regexp.MustCompile(`\.\s*([A-Za-z0-9_]+)`)
 	propMatches := propRegex.FindAllStringSubmatch(cypher, -1)
 	allowedPropSet := make(map[string]bool)
@@ -91,13 +116,19 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 		prop := strings.ToLower(match[1])
 		if !allowedPropSet[prop] {
 			log.Printf("Property check failed: property '%s' is not allowed", match[1])
-			return nil, fmt.Errorf("Query contains disallowed property '%s'", match[1])
+			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed property '%s'", match[1]))
+			analysis.Allowed = false
 		}
 	}
 
-	log.Printf("Property check passed. Allowed properties: %+v\n", allowedPropSet)
+	if len(analysis.Violations) == initialViolations {
+		log.Printf("Property check passed. Allowed properties: %+v\n", allowedPropSet)
+	} else {
+		log.Printf("Property check completed with violations. Allowed properties: %+v\n", allowedPropSet)
+	}
 
 	// Operation Check
+	initialViolations = len(analysis.Violations)
 	lowerQuery := strings.ToLower(cypher)
 	operation := "read" // default for MATCH queries
 	if strings.Contains(lowerQuery, "create") {
@@ -130,17 +161,60 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 			}
 			if !allowed {
 				log.Printf("Operation check failed for label '%s' for operation '%s'\n", label, operation)
-				return nil, fmt.Errorf("Operation '%s' is not allowed on label '%s'", operation, label)
+				analysis.Violations = append(analysis.Violations, fmt.Sprintf("operation '%s' is not allowed on label '%s'", operation, label))
+				analysis.Allowed = false
 			}
 		}
 	}
 
-	log.Printf("Operation check passed. Operation: %s\n", operation)
-	log.Println("All analysis checks passed. Proceeding to execute query")
+	if len(analysis.Violations) == initialViolations {
+		log.Printf("Operation check passed. Operation: %s\n", operation)
+	} else {
+		log.Printf("Operation check completed with violations. Operation: %s\n", operation)
+	}
 
-	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher)
+	log.Println("Analysis complete with violations:", analysis.Violations)
+
+	return analysis, nil
+}
+
+func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, perm *postgres.Permissions) (string, error) {
+	log.Println("Attempting to rewrite the query. Violations:", analysis.Violations)
+
+	if len(analysis.Violations) > 0 {
+		return "", fmt.Errorf("Cannot safely modify the query")
+	}
+	return cypher, nil
+}
+
+// Uses the analysis result and then either executes the original query if allowed or calls the rewriter
+func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, error) {
+	analysis, err := analyzer.AnalyzeQuery(cypher, perm)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to execute query: %w", err)
+		return nil, fmt.Errorf("Analysis error: %w", err)
+	}
+
+	// Execute the query if it passed analysis
+	if analysis.Allowed {
+		log.Println("Query deemed safe. Executing original query...")
+		results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher)
+		if err != nil {
+			return nil, fmt.Errorf("Execution error: %w", err)
+		}
+		return results, nil
+	}
+
+	// Otherwise attempt to rewrite the query
+	log.Println("Query is unsafe. Attempting to rewrite...")
+	rewrittenQuery, err := analyzer.RewriteQuery(cypher, analysis, perm)
+	if err != nil {
+		return nil, fmt.Errorf("forbidden: %w", err)
+	}
+
+	log.Println("Rewritten query accepted. Executing rewritten query...")
+	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, rewrittenQuery)
+	if err != nil {
+		return nil, fmt.Errorf("Execution error after rewriting: %w", err)
 	}
 
 	return results, nil

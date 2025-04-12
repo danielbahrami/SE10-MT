@@ -48,7 +48,7 @@ type RelationshipPermission struct {
 }
 
 // The overall structure representing the access rules
-// AllowedLabels: The list of node labels a user can access.
+// AllowedLabels: The list of node labels a user can access
 // AllowedRelationships: The allowed relationship types along with their permitted directions
 // AllowedProperties: A mapping from an entity (like a node label) to a list of accessible properties
 // OperationPermissions: Which CRUD operations are permitted for different entities

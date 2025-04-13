@@ -181,10 +181,45 @@ func (analyzer *Analyzer) AnalyzeQuery(cypher string, perm *postgres.Permissions
 func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, perm *postgres.Permissions) (string, error) {
 	log.Println("Attempting to rewrite the query. Violations:", analysis.Violations)
 
-	if len(analysis.Violations) > 0 {
+	// Determine if there are any violations other than disallowed properties
+	nonPropertyViolations := false
+	var disallowedProps []string
+	for _, v := range analysis.Violations {
+		if !strings.HasPrefix(v, "disallowed property") {
+			nonPropertyViolations = true
+			break
+		} else {
+			parts := strings.Split(v, "'")
+			if len(parts) >= 2 {
+				disallowedProps = append(disallowedProps, parts[1])
+			}
+		}
+	}
+
+	if nonPropertyViolations {
+		log.Println("Rewriting not possible due to violations other than disallowed properties")
 		return "", fmt.Errorf("Cannot safely modify the query")
 	}
-	return cypher, nil
+
+	// Attempt to remove disallowed property violations from the RETURN clause if only they exist
+	rewrittenQuery := cypher
+	for _, prop := range disallowedProps {
+		// Remove occurrences of the disallowed property
+		pattern := fmt.Sprintf(`(?i)(,?\s*[A-Za-z0-9]+\.\s*%s)`, prop)
+		re := regexp.MustCompile(pattern)
+		rewrittenQuery = re.ReplaceAllString(rewrittenQuery, "")
+	}
+
+	// Verify that after rewriting the query still has a nonempty RETURN clause
+	retRegex := regexp.MustCompile(`(?i)return\s+(.+)$`)
+	matches := retRegex.FindStringSubmatch(rewrittenQuery)
+	if len(matches) < 2 || strings.TrimSpace(matches[1]) == "" {
+		log.Println("Rewriting resulted in an empty RETURN clause; rewriting fails.")
+		return "", fmt.Errorf("rewriting failed; cannot safely modify the query")
+	}
+
+	log.Println("Rewriting succeeded. New query:", rewrittenQuery)
+	return rewrittenQuery, nil
 }
 
 // Uses the analysis result and then either executes the original query if allowed or calls the rewriter

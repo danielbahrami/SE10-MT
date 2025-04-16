@@ -30,11 +30,11 @@ func AuthenticateUser(r *http.Request, dbpool *pgxpool.Pool) (*postgres.User, er
 
 	user, err := postgres.GetUserByEmail(r.Context(), dbpool, email)
 	if err != nil {
-		return nil, fmt.Errorf("User not found")
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedBearerToken), []byte(token)); err != nil {
-		return nil, fmt.Errorf("Invalid token")
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	return user, nil

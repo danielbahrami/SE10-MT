@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/danielbahrami/se10-mt/internal/analyzer"
@@ -13,7 +14,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 	// Health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "", http.StatusMethodNotAllowed)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")
@@ -23,7 +24,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 	// Query endpoint
 	mux.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "", http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -41,7 +42,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&payload); err != nil {
-			http.Error(w, "Invalid payload format", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -53,14 +54,18 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		// Retrieve user permissions
 		perm, err := postgres.GetUserPermissions(r.Context(), dbpool, user)
 		if err != nil {
-			http.Error(w, "Error retrieving user permissions", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// Provide the Cypher query and the user's permissions to the analyzer
 		results, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
-			http.Error(w, "Error analyzing query", http.StatusInternalServerError)
+			if errors.Is(err, analyzer.ForbiddenQueryErr) {
+				http.Error(w, err.Error(), http.StatusForbidden)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 

@@ -22,7 +22,7 @@ func ConnectPostgres() (*pgxpool.Pool, error) {
 
 	dbpool, err := pgxpool.New(context.Background(), DATABASE_URL)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create connection pool: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	log.Println("Connected to Postgres")
@@ -38,7 +38,7 @@ func GetUserByEmail(ctx context.Context, dbpool *pgxpool.Pool, email string) (*U
 	var user User
 	err := row.Scan(&user.ID, &user.OrgID, &user.Name, &user.Email, &user.HashedBearerToken, &user.OverridePermissions, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("GetUserByEmail: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	return &user, nil
@@ -53,7 +53,7 @@ func GetOrganizationById(ctx context.Context, dbpool *pgxpool.Pool, id int) (*Or
 	var org Organization
 	err := row.Scan(&org.ID, &org.Name, &org.DefaultPermissions, &org.CreatedAt, &org.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("GetOrganizationById: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	return &org, nil
@@ -66,14 +66,14 @@ func GetUserPermissions(ctx context.Context, dbpool *pgxpool.Pool, user *User) (
 	} else {
 		org, err := GetOrganizationById(ctx, dbpool, user.OrgID)
 		if err != nil {
-			return nil, fmt.Errorf("GetUserPermissions: %w", err)
+			return nil, fmt.Errorf("%s", err.Error())
 		}
 		effectivePermissions = org.DefaultPermissions
 	}
 
 	var permissions Permissions
 	if err := json.Unmarshal([]byte(effectivePermissions), &permissions); err != nil {
-		return nil, fmt.Errorf("GetUserPermissions: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	return &permissions, nil

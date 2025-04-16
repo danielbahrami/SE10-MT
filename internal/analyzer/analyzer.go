@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -23,6 +24,9 @@ type AnalysisResult struct {
 	Allowed    bool
 	Violations []string
 }
+
+// Returned when a query is unsafe and rewriting failed
+var ForbiddenQueryErr = errors.New("")
 
 // Creates a new Analyzer instance
 func New(ctx context.Context, driver neo4j.DriverWithContext) *Analyzer {
@@ -226,7 +230,7 @@ func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, 
 func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, error) {
 	analysis, err := analyzer.AnalyzeQuery(cypher, perm)
 	if err != nil {
-		return nil, fmt.Errorf("Analysis error: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	// Execute the query if it passed analysis
@@ -234,7 +238,7 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 		log.Println("Query deemed safe. Executing original query...")
 		results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher)
 		if err != nil {
-			return nil, fmt.Errorf("Execution error: %w", err)
+			return nil, fmt.Errorf("%s", err.Error())
 		}
 		return results, nil
 	}
@@ -243,13 +247,13 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 	log.Println("Query is unsafe. Attempting to rewrite...")
 	rewrittenQuery, err := analyzer.RewriteQuery(cypher, analysis, perm)
 	if err != nil {
-		return nil, fmt.Errorf("forbidden: %w", err)
+		return nil, ForbiddenQueryErr
 	}
 
 	log.Println("Rewritten query accepted. Executing rewritten query...")
 	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, rewrittenQuery)
 	if err != nil {
-		return nil, fmt.Errorf("Execution error after rewriting: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	return results, nil

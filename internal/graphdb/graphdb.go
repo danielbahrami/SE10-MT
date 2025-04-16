@@ -20,11 +20,11 @@ func ConnectNeo4j(ctx context.Context) (neo4j.DriverWithContext, error) {
 
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth(dbUser, dbPassword, ""))
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create Neo4j driver: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	if err = driver.VerifyConnectivity(ctx); err != nil {
-		return nil, fmt.Errorf("Unable to connect to Neo4j: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	log.Println("Connected to Neo4j")
@@ -42,7 +42,7 @@ func QueryHandler(
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 	if err != nil {
-		return nil, fmt.Errorf("QueryHandler failed: %w", err)
+		return nil, fmt.Errorf("%s", err.Error())
 	}
 
 	var records []QueryResult
@@ -50,7 +50,7 @@ func QueryHandler(
 		records = append(records, record.AsMap())
 	}
 
-	log.Printf("The query `%v` returned %v records in %+v.\n",
+	log.Printf("The query `%v` returned %v records in %v\n",
 		result.Summary.Query().Text(),
 		len(result.Records),
 		result.Summary.ResultAvailableAfter())

@@ -65,7 +65,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

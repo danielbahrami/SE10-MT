@@ -205,25 +205,47 @@ func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, 
 		return "", false, fmt.Errorf("Cannot safely modify the query")
 	}
 
-	// Attempt to remove disallowed property violations from the RETURN clause if only they exist
-	rewrittenQuery := cypher
-	for _, prop := range disallowedProps {
-		// Remove occurrences of the disallowed property
-		pattern := fmt.Sprintf(`(?i)(,?\s*[A-Za-z0-9]+\.\s*%s)`, prop)
-		re := regexp.MustCompile(pattern)
-		rewrittenQuery = re.ReplaceAllString(rewrittenQuery, "")
+	// Extract the RETURN clause from the query
+	// This assumes the RETURN clause is at the end of the query
+	retRegex := regexp.MustCompile(`(?i)return\s+(.+)$`)
+	matches := retRegex.FindStringSubmatch(cypher)
+	if len(matches) < 2 {
+		log.Println("No RETURN clause found; rewriting fails.")
+		return "", false, fmt.Errorf("rewriting failed; cannot safely modify the query")
 	}
 
-	// Verify that after rewriting the query still has a nonempty RETURN clause
-	retRegex := regexp.MustCompile(`(?i)return\s+(.+)$`)
-	matches := retRegex.FindStringSubmatch(rewrittenQuery)
-	if len(matches) < 2 || strings.TrimSpace(matches[1]) == "" {
+	originalReturnClause := matches[1]
+
+	// Split the RETURN clause into individual fields
+	fields := strings.Split(originalReturnClause, ",")
+	var allowedFields []string
+
+fieldLoop:
+	for _, field := range fields {
+		trimmed := strings.TrimSpace(field)
+		// Skip fields that reference any disallowed property
+		for _, prop := range disallowedProps {
+			if strings.Contains(strings.ToLower(trimmed), "."+strings.ToLower(prop)) {
+				log.Printf("Removing field '%s' due to disallowed property '%s'\n", trimmed, prop)
+				continue fieldLoop
+			}
+		}
+		allowedFields = append(allowedFields, trimmed)
+	}
+
+	if len(allowedFields) == 0 {
 		log.Println("Rewriting resulted in an empty RETURN clause; rewriting fails.")
 		return "", false, fmt.Errorf("rewriting failed; cannot safely modify the query")
 	}
 
+	// Rebuild the new RETURN clause
+	newReturnClause := "RETURN " + strings.Join(allowedFields, ", ")
+
+	// Replace the original RETURN clause with the new one
+	rewrittenQuery := retRegex.ReplaceAllString(cypher, newReturnClause)
+
 	log.Println("Rewriting succeeded. New query:", rewrittenQuery)
-	return rewrittenQuery, true, nil // That a rewritten query was returned is indicated by 'true'
+	return rewrittenQuery, true, nil // 'true' indicates a rewritten query was returned
 }
 
 // Uses the analysis result and then either executes the original query if allowed or calls the rewriter

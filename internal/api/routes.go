@@ -59,7 +59,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		}
 
 		// Provide the Cypher query and the user's permissions to the analyzer
-		results, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
+		results, wasRewritten, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
 			if errors.Is(err, analyzer.ForbiddenQueryErr) {
 				http.Error(w, err.Error(), http.StatusForbidden)
@@ -70,6 +70,10 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		}
 
 		// Return the results to the client
+		if wasRewritten {
+			w.Header().Set("Query-Rewritten", "true")
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(results)
 	})

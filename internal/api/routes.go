@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -63,9 +64,12 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		results, wasRewritten, rewrittenQuery, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
 			if errors.Is(err, analyzer.ForbiddenQueryErr) {
-				if logErr := postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Blocked", ""); logErr != nil {
-					log.Println(logErr.Error())
-				}
+				go func(pool *pgxpool.Pool, userID int, query, status, rewritten string) {
+					if err := postgres.LogQuery(context.Background(), pool, userID, query, status, rewritten); err != nil {
+						log.Println(err.Error())
+					}
+				}(dbpool, user.ID, payload.Cypher, "Blocked", "")
+
 				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
@@ -75,14 +79,19 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 
 		// Return the results to the client
 		if wasRewritten {
-			if logErr := postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Rewritten", rewrittenQuery); logErr != nil {
-				log.Println(logErr.Error())
-			}
+			go func(pool *pgxpool.Pool, userID int, query, status, rewritten string) {
+				if err := postgres.LogQuery(context.Background(), pool, userID, query, status, rewritten); err != nil {
+					log.Println(err.Error())
+				}
+			}(dbpool, user.ID, payload.Cypher, "Rewritten", rewrittenQuery)
+
 			w.Header().Set("Query-Rewritten", "true")
 		} else {
-			if logErr := postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Allowed", ""); logErr != nil {
-				log.Println(logErr.Error())
-			}
+			go func(pool *pgxpool.Pool, userID int, query, status, rewritten string) {
+				if err := postgres.LogQuery(context.Background(), pool, userID, query, status, rewritten); err != nil {
+					log.Println(err.Error())
+				}
+			}(dbpool, user.ID, payload.Cypher, "Allowed", "")
 		}
 
 		w.Header().Set("Content-Type", "application/json")

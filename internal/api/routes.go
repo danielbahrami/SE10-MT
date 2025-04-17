@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/danielbahrami/se10-mt/internal/analyzer"
@@ -62,7 +63,9 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		results, wasRewritten, rewrittenQuery, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
 			if errors.Is(err, analyzer.ForbiddenQueryErr) {
-				postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Blocked", "")
+				if logErr := postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Blocked", ""); logErr != nil {
+					log.Println(logErr.Error())
+				}
 				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
@@ -72,10 +75,14 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 
 		// Return the results to the client
 		if wasRewritten {
-			postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Rewritten", rewrittenQuery)
+			if logErr := postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Rewritten", rewrittenQuery); logErr != nil {
+				log.Println(logErr.Error())
+			}
 			w.Header().Set("Query-Rewritten", "true")
 		} else {
-			postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Allowed", "")
+			if logErr := postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Allowed", ""); logErr != nil {
+				log.Println(logErr.Error())
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

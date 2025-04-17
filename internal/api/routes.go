@@ -59,9 +59,10 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		}
 
 		// Provide the Cypher query and the user's permissions to the analyzer
-		results, wasRewritten, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
+		results, wasRewritten, rewrittenQuery, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
 			if errors.Is(err, analyzer.ForbiddenQueryErr) {
+				postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Blocked", "")
 				http.Error(w, err.Error(), http.StatusForbidden)
 				return
 			}
@@ -71,7 +72,10 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 
 		// Return the results to the client
 		if wasRewritten {
+			postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Rewritten", rewrittenQuery)
 			w.Header().Set("Query-Rewritten", "true")
+		} else {
+			postgres.LogQuery(r.Context(), dbpool, user.ID, payload.Cypher, "Allowed", "")
 		}
 
 		w.Header().Set("Content-Type", "application/json")

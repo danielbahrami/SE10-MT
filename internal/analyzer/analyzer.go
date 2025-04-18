@@ -33,7 +33,7 @@ func New(ctx context.Context, driver neo4j.DriverWithContext) *Analyzer {
 	return &Analyzer{ctx: ctx, driver: driver}
 }
 
-func (analyzer *Analyzer) AnalyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
+func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
 	log.Println("Analyzing the following query:", cypher)
 
 	analysis := &AnalysisResult{
@@ -182,7 +182,7 @@ func (analyzer *Analyzer) AnalyzeQuery(cypher string, perm *postgres.Permissions
 	return analysis, nil
 }
 
-func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, perm *postgres.Permissions) (string, bool, error) {
+func (analyzer *Analyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (string, bool, error) {
 	log.Println("Attempting to rewrite the query. Violations:", analysis.Violations)
 
 	// Determine if there are any violations other than disallowed properties
@@ -202,7 +202,7 @@ func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, 
 
 	if nonPropertyViolations {
 		log.Println("Rewriting not possible due to violations other than disallowed properties")
-		return "", false, fmt.Errorf("Cannot safely modify the query")
+		return "", false, fmt.Errorf("Cannot safely rewrite the query")
 	}
 
 	// Extract the RETURN clause from the query
@@ -210,8 +210,8 @@ func (analyzer *Analyzer) RewriteQuery(cypher string, analysis *AnalysisResult, 
 	retRegex := regexp.MustCompile(`(?i)return\s+(.+)$`)
 	matches := retRegex.FindStringSubmatch(cypher)
 	if len(matches) < 2 {
-		log.Println("No RETURN clause found; rewriting fails.")
-		return "", false, fmt.Errorf("rewriting failed; cannot safely modify the query")
+		log.Println("Rewriting fails due to no RETURN clause being found")
+		return "", false, fmt.Errorf("Cannot safely rewrite the query")
 	}
 
 	originalReturnClause := matches[1]
@@ -234,8 +234,8 @@ fieldLoop:
 	}
 
 	if len(allowedFields) == 0 {
-		log.Println("Rewriting resulted in an empty RETURN clause; rewriting fails.")
-		return "", false, fmt.Errorf("rewriting failed; cannot safely modify the query")
+		log.Println("Rewriting fails due to resulting in an empty RETURN clause")
+		return "", false, fmt.Errorf("Cannot safely rewrite the query")
 	}
 
 	// Rebuild the new RETURN clause
@@ -250,7 +250,7 @@ fieldLoop:
 
 // Uses the analysis result and then either executes the original query if allowed or calls the rewriter
 func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, error) {
-	analysis, err := analyzer.AnalyzeQuery(cypher, perm)
+	analysis, err := analyzer.analyzeQuery(cypher, perm)
 	if err != nil {
 		return nil, false, "", fmt.Errorf("%s", err.Error())
 	}
@@ -267,7 +267,7 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 
 	// Otherwise attempt to rewrite the query
 	log.Println("Query is unsafe. Attempting to rewrite...")
-	rewrittenQuery, wasRewritten, err := analyzer.RewriteQuery(cypher, analysis, perm)
+	rewrittenQuery, wasRewritten, err := analyzer.rewriteQuery(cypher, analysis)
 	if err != nil {
 		return nil, wasRewritten, rewrittenQuery, ForbiddenQueryErr
 	}

@@ -45,7 +45,11 @@ func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions
 	initialViolations := len(analysis.Violations)
 
 	// Use regex that matches node definitions in parentheses
-	nodeLabelRegex := regexp.MustCompile(`\(\s*[A-Za-z0-9]*\s*:\s*([A-Za-z0-9_]+)`)
+	nodeLabelRegex, err := regexp.Compile(`\(\s*[A-Za-z0-9]*\s*:\s*([A-Za-z0-9_]+)`)
+	if err != nil {
+		return nil, fmt.Errorf("%s", err.Error())
+	}
+
 	labelMatches := nodeLabelRegex.FindAllStringSubmatch(cypher, -1)
 
 	allowedLabelSet := make(map[string]bool)
@@ -75,7 +79,11 @@ func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions
 
 	// Relationship Check
 	initialViolations = len(analysis.Violations)
-	relRegex := regexp.MustCompile(`-\[\s*[^\]]*:\s*([A-Za-z0-9_]+)`)
+	relRegex, err := regexp.Compile(`-\[\s*[^\]]*:\s*([A-Za-z0-9_]+)`)
+	if err != nil {
+		return nil, fmt.Errorf("%s", err.Error())
+	}
+
 	relMatches := relRegex.FindAllStringSubmatch(cypher, -1)
 	allowedRelSet := make(map[string]bool)
 	for _, rel := range perm.AllowedRelationships {
@@ -102,7 +110,11 @@ func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions
 
 	// Property Check
 	initialViolations = len(analysis.Violations)
-	propRegex := regexp.MustCompile(`\.\s*([A-Za-z0-9_]+)`)
+	propRegex, err := regexp.Compile(`\.\s*([A-Za-z0-9_]+)`)
+	if err != nil {
+		return nil, fmt.Errorf("%s", err.Error())
+	}
+
 	propMatches := propRegex.FindAllStringSubmatch(cypher, -1)
 	allowedPropSet := make(map[string]bool)
 	for _, props := range perm.AllowedProperties {
@@ -205,7 +217,11 @@ func (analyzer *Analyzer) rewriteQuery(cypher string, analysis *AnalysisResult) 
 
 	// Extract the RETURN clause from the query
 	// This assumes the RETURN clause is at the end of the query
-	retRegex := regexp.MustCompile(`(?i)return\s+(.+)$`)
+	retRegex, err := regexp.Compile(`(?i)return\s+(.+)$`)
+	if err != nil {
+		return "", false, fmt.Errorf("%s", err.Error())
+	}
+
 	matches := retRegex.FindStringSubmatch(cypher)
 	if len(matches) < 2 {
 		log.Println("Rewriting fails due to no RETURN clause being found")

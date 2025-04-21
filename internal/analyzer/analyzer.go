@@ -78,10 +78,8 @@ func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions
 	relRegex := regexp.MustCompile(`-\[\s*[^\]]*:\s*([A-Za-z0-9_]+)`)
 	relMatches := relRegex.FindAllStringSubmatch(cypher, -1)
 	allowedRelSet := make(map[string]bool)
-	for _, rp := range perm.AllowedRelationships {
-		for _, t := range rp.Types {
-			allowedRelSet[strings.ToLower(t)] = true
-		}
+	for _, rel := range perm.AllowedRelationships {
+		allowedRelSet[strings.ToLower(rel)] = true
 	}
 
 	for _, match := range relMatches {

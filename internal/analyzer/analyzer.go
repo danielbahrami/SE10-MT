@@ -263,10 +263,10 @@ fieldLoop:
 }
 
 // Uses the analysis result and then either executes the original query if allowed or calls the rewriter
-func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, error) {
+func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, []string, error) {
 	analysis, err := analyzer.analyzeQuery(cypher, perm)
 	if err != nil {
-		return nil, false, "", fmt.Errorf("%s", err.Error())
+		return nil, false, "", nil, fmt.Errorf("%s", err.Error())
 	}
 
 	// Execute the query if it passed analysis
@@ -274,23 +274,23 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 		log.Println("Query deemed safe. Executing original query...")
 		results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher)
 		if err != nil {
-			return nil, false, "", fmt.Errorf("%s", err.Error())
+			return nil, false, "", analysis.Violations, fmt.Errorf("%s", err.Error())
 		}
-		return results, false, "", nil
+		return results, false, "", analysis.Violations, nil
 	}
 
 	// Otherwise attempt to rewrite the query
 	log.Println("Query is unsafe. Attempting to rewrite...")
 	rewrittenQuery, wasRewritten, err := analyzer.rewriteQuery(cypher, analysis)
 	if err != nil {
-		return nil, wasRewritten, rewrittenQuery, ForbiddenQueryErr
+		return nil, wasRewritten, rewrittenQuery, analysis.Violations, ForbiddenQueryErr
 	}
 
 	log.Println("Rewritten query accepted. Executing rewritten query...")
 	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, rewrittenQuery)
 	if err != nil {
-		return nil, wasRewritten, rewrittenQuery, fmt.Errorf("%s", err.Error())
+		return nil, wasRewritten, rewrittenQuery, analysis.Violations, fmt.Errorf("%s", err.Error())
 	}
 
-	return results, wasRewritten, rewrittenQuery, nil
+	return results, wasRewritten, rewrittenQuery, analysis.Violations, nil
 }

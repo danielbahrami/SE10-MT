@@ -6,11 +6,18 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/danielbahrami/se10-mt/internal/analyzer"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type QueryResponse struct {
+	Data          []map[string]any `json:"data"`
+	Rewritten     bool             `json:"rewritten"`
+	RewriteReason string           `json:"rewriteReason,omitempty"`
+}
 
 func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *analyzer.Analyzer) {
 	// Health endpoint
@@ -61,7 +68,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		}
 
 		// Provide the Cypher query and the user's permissions to the analyzer
-		results, wasRewritten, rewrittenQuery, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
+		results, wasRewritten, rewrittenQuery, violations, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
 			if errors.Is(err, analyzer.ForbiddenQueryErr) {
 				go func(pool *pgxpool.Pool, userID int, query, status, rewritten string) {
@@ -70,11 +77,17 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 					}
 				}(dbpool, user.ID, payload.Cypher, "Blocked", "")
 
-				http.Error(w, err.Error(), http.StatusForbidden)
+				http.Error(w, strings.Join(violations, ", "), http.StatusForbidden)
 				return
 			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+
+		response := QueryResponse{
+			Data:          results,
+			Rewritten:     wasRewritten,
+			RewriteReason: "",
 		}
 
 		// Return the results to the client
@@ -85,7 +98,7 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 				}
 			}(dbpool, user.ID, payload.Cypher, "Rewritten", rewrittenQuery)
 
-			w.Header().Set("Query-Rewritten", "true")
+			response.RewriteReason = strings.Join(violations, ", ")
 		} else {
 			go func(pool *pgxpool.Pool, userID int, query, status, rewritten string) {
 				if err := postgres.LogQuery(context.Background(), pool, userID, query, status, rewritten); err != nil {
@@ -95,6 +108,6 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(results)
+		json.NewEncoder(w).Encode(response)
 	})
 }

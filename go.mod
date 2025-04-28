@@ -3,11 +3,15 @@ module github.com/danielbahrami/se10-mt
 go 1.24.2
 
 require (
+	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.0
 )
 
-require github.com/stretchr/testify v1.10.0 // indirect
+require (
+	github.com/stretchr/testify v1.10.0 // indirect
+	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

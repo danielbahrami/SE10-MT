@@ -19,7 +19,7 @@ type QueryResponse struct {
 	RewriteReason string           `json:"rewriteReason,omitempty"`
 }
 
-func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *analyzer.Analyzer) {
+func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, regexAnalyzer analyzer.Analyzer, parserAnalyzer analyzer.Analyzer) {
 	// Health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -67,8 +67,25 @@ func SetupRoutes(mux *http.ServeMux, dbpool *pgxpool.Pool, analyzerInstance *ana
 			return
 		}
 
+		// Select analyzer based on header
+		mode := r.Header.Get("Analyzer-Mode")
+		var activeAnalyzer analyzer.Analyzer
+
+		switch mode {
+		case "regex":
+			activeAnalyzer = regexAnalyzer
+		case "parser":
+			activeAnalyzer = parserAnalyzer
+		case "":
+			http.Error(w, "Missing analyzer-mode header", http.StatusBadRequest)
+			return
+		default:
+			http.Error(w, "Invalid analyzer-mode header (must be 'regex' or 'parser')", http.StatusBadRequest)
+			return
+		}
+
 		// Provide the Cypher query and the user's permissions to the analyzer
-		results, wasRewritten, rewrittenQuery, violations, err := analyzerInstance.AnalyzeAndExecute(payload.Cypher, perm)
+		results, wasRewritten, rewrittenQuery, violations, err := activeAnalyzer.AnalyzeAndExecute(payload.Cypher, perm)
 		if err != nil {
 			if errors.Is(err, analyzer.ForbiddenQueryErr) {
 				go func(pool *pgxpool.Pool, userID int, query, status, rewritten string) {

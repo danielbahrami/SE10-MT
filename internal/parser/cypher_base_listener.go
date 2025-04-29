@@ -1,6 +1,6 @@
 // Code generated from Cypher.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
-package grammar // Cypher
+package parser // Cypher
 import "github.com/antlr4-go/antlr/v4"
 
 // BaseCypherListener is a complete listener for a parse tree produced by CypherParser.

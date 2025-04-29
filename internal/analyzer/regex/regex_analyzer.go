@@ -1,20 +1,22 @@
-package analyzer
+package regex
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"regexp"
 	"strings"
 
+	"github.com/danielbahrami/se10-mt/internal/analyzer"
 	"github.com/danielbahrami/se10-mt/internal/graphdb"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+var _ analyzer.Analyzer = (*RegexAnalyzer)(nil)
+
 // Encapsulates the context and Neo4j driver
-type Analyzer struct {
+type RegexAnalyzer struct {
 	ctx    context.Context
 	driver neo4j.DriverWithContext
 }
@@ -26,14 +28,14 @@ type AnalysisResult struct {
 }
 
 // Returned when a query is unsafe and rewriting failed
-var ForbiddenQueryErr = errors.New("")
+var ForbiddenQueryErr = analyzer.ForbiddenQueryErr
 
 // Creates a new Analyzer instance
-func New(ctx context.Context, driver neo4j.DriverWithContext) *Analyzer {
-	return &Analyzer{ctx: ctx, driver: driver}
+func New(ctx context.Context, driver neo4j.DriverWithContext) *RegexAnalyzer {
+	return &RegexAnalyzer{ctx: ctx, driver: driver}
 }
 
-func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
+func (analyzer *RegexAnalyzer) analyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
 	log.Println("Analyzing the following query:", cypher)
 
 	analysis := &AnalysisResult{
@@ -192,7 +194,7 @@ func (analyzer *Analyzer) analyzeQuery(cypher string, perm *postgres.Permissions
 	return analysis, nil
 }
 
-func (analyzer *Analyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (string, bool, error) {
+func (r *RegexAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (string, bool, error) {
 	log.Println("Attempting to rewrite the query. Violations:", analysis.Violations)
 
 	// Determine if there are any violations other than disallowed properties
@@ -262,17 +264,16 @@ fieldLoop:
 	return rewrittenQuery, true, nil // 'true' indicates a rewritten query was returned
 }
 
-// Uses the analysis result and then either executes the original query if allowed or calls the rewriter
-func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, []string, error) {
-	analysis, err := analyzer.analyzeQuery(cypher, perm)
+func (r *RegexAnalyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, []string, error) {
+	analysis, err := r.analyzeQuery(cypher, perm)
 	if err != nil {
-		return nil, false, "", nil, fmt.Errorf("%s", err.Error())
+		return nil, false, "", nil, err
 	}
 
 	// Execute the query if it passed analysis
 	if analysis.Allowed {
 		log.Println("Query deemed safe. Executing original query...")
-		results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, cypher)
+		results, err := graphdb.QueryHandler(r.ctx, r.driver, cypher)
 		if err != nil {
 			return nil, false, "", analysis.Violations, fmt.Errorf("%s", err.Error())
 		}
@@ -281,13 +282,13 @@ func (analyzer *Analyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permis
 
 	// Otherwise attempt to rewrite the query
 	log.Println("Query is unsafe. Attempting to rewrite...")
-	rewrittenQuery, wasRewritten, err := analyzer.rewriteQuery(cypher, analysis)
+	rewrittenQuery, wasRewritten, err := r.rewriteQuery(cypher, analysis)
 	if err != nil {
-		return nil, wasRewritten, rewrittenQuery, analysis.Violations, ForbiddenQueryErr
+		return nil, wasRewritten, rewrittenQuery, analysis.Violations, analyzer.ForbiddenQueryErr
 	}
 
 	log.Println("Rewritten query accepted. Executing rewritten query...")
-	results, err := graphdb.QueryHandler(analyzer.ctx, analyzer.driver, rewrittenQuery)
+	results, err := graphdb.QueryHandler(r.ctx, r.driver, rewrittenQuery)
 	if err != nil {
 		return nil, wasRewritten, rewrittenQuery, analysis.Violations, fmt.Errorf("%s", err.Error())
 	}

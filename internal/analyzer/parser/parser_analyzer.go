@@ -59,6 +59,62 @@ func parse(input string) antlr.ParseTree {
 	return p.OC_Cypher()
 }
 
+func (l *TreeListener) EnterOC_NodePattern(ctx *parser.OC_NodePatternContext) {
+	labelsCtx := ctx.OC_NodeLabels()
+	if labelsCtx == nil {
+		return
+	}
+
+	for _, nodeLabelCtx := range labelsCtx.AllOC_NodeLabel() {
+		labelNameCtx := nodeLabelCtx.OC_LabelName()
+		if labelNameCtx == nil {
+			continue
+		}
+		name := labelNameCtx.GetText()
+		l.labelsFound[strings.ToLower(name)] = true
+	}
+}
+
+func (l *TreeListener) EnterOC_RelationshipPattern(ctx *parser.OC_RelationshipPatternContext) {
+	rd := ctx.OC_RelationshipDetail()
+	if rd == nil {
+		return
+	}
+
+	rtCtxs := rd.OC_RelationshipTypes()
+	if rtCtxs == nil {
+		return
+	}
+
+	for _, relTypeCtx := range rtCtxs.AllOC_RelTypeName() {
+		text := relTypeCtx.GetText()
+		rel := strings.TrimPrefix(text, ":")
+		l.relFound[strings.ToLower(rel)] = true
+	}
+}
+
+func (l *TreeListener) EnterOC_PropertyLookup(ctx *parser.OC_PropertyLookupContext) {
+	pkCtx := ctx.OC_PropertyKeyName()
+	if pkCtx == nil {
+		return
+	}
+
+	name := pkCtx.GetText()
+	l.propsFound[strings.ToLower(name)] = true
+}
+
+func (l *TreeListener) EnterOC_Create(ctx *parser.OC_CreateContext) {
+	l.hasCreate = true
+}
+
+func (l *TreeListener) EnterOC_Set(ctx *parser.OC_SetContext) {
+	l.hasUpdate = true
+}
+
+func (l *TreeListener) EnterOC_Delete(ctx *parser.OC_DeleteContext) {
+	l.hasDelete = true
+}
+
 func (p *ParserAnalyzer) analyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
 	log.Println("Analyzing the following query:", cypher)
 	listener := newTreeListener()

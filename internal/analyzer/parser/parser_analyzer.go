@@ -1,4 +1,4 @@
-package regex
+package parser
 
 import (
 	"context"
@@ -7,86 +7,97 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/antlr4-go/antlr/v4"
 	"github.com/danielbahrami/se10-mt/internal/analyzer"
 	"github.com/danielbahrami/se10-mt/internal/graphdb"
+	"github.com/danielbahrami/se10-mt/internal/parser"
 	"github.com/danielbahrami/se10-mt/internal/postgres"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 // Encapsulates the context and Neo4j driver
-type RegexAnalyzer struct {
+type ParserAnalyzer struct {
 	*analyzer.BaseAnalyzer
 }
 
-var _ analyzer.Analyzer = (*RegexAnalyzer)(nil)
+var _ analyzer.Analyzer = (*ParserAnalyzer)(nil)
 
 // Holds the outcome of a query analysis
 type AnalysisResult = analyzer.AnalysisResult
 
-// Creates a new Analyzer instance
-func New(ctx context.Context, driver neo4j.DriverWithContext) *RegexAnalyzer {
-	return &RegexAnalyzer{BaseAnalyzer: analyzer.NewBaseAnalyzer(ctx, driver)}
+type TreeListener struct {
+	*parser.BaseCypherListener
+	labelsFound map[string]bool
+	relFound    map[string]bool
+	propsFound  map[string]bool
+	hasCreate   bool
+	hasUpdate   bool
+	hasDelete   bool
 }
 
-func (analyzer *RegexAnalyzer) analyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
+// Creates a new Analyzer instance
+func New(ctx context.Context, driver neo4j.DriverWithContext) *ParserAnalyzer {
+	return &ParserAnalyzer{BaseAnalyzer: analyzer.NewBaseAnalyzer(ctx, driver)}
+}
+
+func newTreeListener() *TreeListener {
+	return &TreeListener{
+		BaseCypherListener: &parser.BaseCypherListener{},
+		labelsFound:        make(map[string]bool),
+		relFound:           make(map[string]bool),
+		propsFound:         make(map[string]bool),
+	}
+}
+
+// Returns the ANTLR parse-tree for an input Cypher string
+func parse(input string) antlr.ParseTree {
+	is := antlr.NewInputStream(input)
+	lex := parser.NewCypherLexer(is)
+	tokens := antlr.NewCommonTokenStream(lex, 0)
+	p := parser.NewCypherParser(tokens)
+	p.BuildParseTrees = true
+	return p.OC_Cypher()
+}
+
+func (p *ParserAnalyzer) analyzeQuery(cypher string, perm *postgres.Permissions) (*AnalysisResult, error) {
 	log.Println("Analyzing the following query:", cypher)
+	listener := newTreeListener()
+	tree := parse(cypher)
+	antlr.ParseTreeWalkerDefault.Walk(listener, tree)
 	analysis := &AnalysisResult{Allowed: true, Violations: []string{}}
 	initialViolations := len(analysis.Violations)
 
-	// Node Label Check
-	// Use regex that matches node definitions in parentheses
-	nodeLabelRegex, err := regexp.Compile(`\(\s*[A-Za-z0-9]*\s*:\s*([A-Za-z0-9_]+)`)
-	if err != nil {
-		return nil, fmt.Errorf("%s", err.Error())
-	}
-
-	labelMatches := nodeLabelRegex.FindAllStringSubmatch(cypher, -1)
-	allowedLabels := make(map[string]bool)
+	// Node Label check
+	allowedLabels := make(map[string]bool, len(perm.AllowedLabels))
 	for _, l := range perm.AllowedLabels {
 		allowedLabels[strings.ToLower(l)] = true
 	}
 
-	labelsFound := make(map[string]bool)
-	for _, match := range labelMatches {
-		if len(match) < 2 {
-			continue
-		}
-		label := strings.ToLower(match[1])
-		labelsFound[label] = true
+	for label := range listener.labelsFound {
 		if !allowedLabels[label] {
-			log.Printf("Label check failed: label '%s' is not allowed", match[1])
-			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed label '%s'", match[1]))
+			log.Printf("Label check failed: label '%s' is not allowed", label)
+			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed label '%s'", label))
 			analysis.Allowed = false
 		}
 	}
 
 	if len(analysis.Violations) == initialViolations {
-		log.Printf("Label check passed. Labels found: %+v\n", labelsFound)
+		log.Printf("Label check passed. Labels found: %+v\n", listener.labelsFound)
 	} else {
-		log.Printf("Label check completed with violations. Labels found: %+v\n", labelsFound)
+		log.Printf("Label check completed with violations. Labels found: %+v\n", listener.labelsFound)
 	}
 
-	// Relationship Check
+	// Relationship check
 	initialViolations = len(analysis.Violations)
-	relRegex, err := regexp.Compile(`-\[\s*[^\]]*:\s*([A-Za-z0-9_]+)`)
-	if err != nil {
-		return nil, fmt.Errorf("%s", err.Error())
-	}
-
-	relMatches := relRegex.FindAllStringSubmatch(cypher, -1)
-	allowedRels := make(map[string]bool)
+	allowedRels := make(map[string]bool, len(perm.AllowedRelationships))
 	for _, rel := range perm.AllowedRelationships {
 		allowedRels[strings.ToLower(rel)] = true
 	}
 
-	for _, match := range relMatches {
-		if len(match) < 2 {
-			continue
-		}
-		relType := strings.ToLower(match[1])
-		if !allowedRels[relType] {
-			log.Printf("Relationship check failed: relationship type '%s' is not allowed", match[1])
-			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed relationship type '%s'", match[1]))
+	for rel := range listener.relFound {
+		if !allowedRels[rel] {
+			log.Printf("Relationship check failed: relationship type '%s' is not allowed", rel)
+			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed relationship type '%s'", rel))
 			analysis.Allowed = false
 		}
 	}
@@ -97,14 +108,8 @@ func (analyzer *RegexAnalyzer) analyzeQuery(cypher string, perm *postgres.Permis
 		log.Println("Relationship check completed with violations")
 	}
 
-	// Property Check
+	// Property check
 	initialViolations = len(analysis.Violations)
-	propRegex, err := regexp.Compile(`\.\s*([A-Za-z0-9_]+)`)
-	if err != nil {
-		return nil, fmt.Errorf("%s", err.Error())
-	}
-
-	propMatches := propRegex.FindAllStringSubmatch(cypher, -1)
 	allowedProps := make(map[string]bool)
 	for _, props := range perm.AllowedProperties {
 		for _, prop := range props {
@@ -112,14 +117,10 @@ func (analyzer *RegexAnalyzer) analyzeQuery(cypher string, perm *postgres.Permis
 		}
 	}
 
-	for _, match := range propMatches {
-		if len(match) < 2 {
-			continue
-		}
-		prop := strings.ToLower(match[1])
+	for prop := range listener.propsFound {
 		if !allowedProps[prop] {
-			log.Printf("Property check failed: property '%s' is not allowed", match[1])
-			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed property '%s'", match[1]))
+			log.Printf("Property check failed: property '%s' is not allowed", prop)
+			analysis.Violations = append(analysis.Violations, fmt.Sprintf("disallowed property '%s'", prop))
 			analysis.Allowed = false
 		}
 	}
@@ -130,25 +131,24 @@ func (analyzer *RegexAnalyzer) analyzeQuery(cypher string, perm *postgres.Permis
 		log.Printf("Property check completed with violations. Allowed properties: %+v\n", allowedProps)
 	}
 
-	// Operation Check
+	// Operation check
 	initialViolations = len(analysis.Violations)
-	lowerQuery := strings.ToLower(cypher)
 	operation := "read" // default for MATCH queries
-	if strings.Contains(lowerQuery, "create") {
+	if listener.hasCreate {
 		operation = "create"
-	} else if strings.Contains(lowerQuery, "set") {
+	} else if listener.hasUpdate {
 		operation = "update"
-	} else if strings.Contains(lowerQuery, "delete") {
+	} else if listener.hasDelete {
 		operation = "delete"
 	}
 
 	// Normalize the operation permissions keys
-	opPerms := make(map[string]postgres.OperationPermissions)
+	opPerms := make(map[string]postgres.OperationPermissions, len(perm.OperationPermissions))
 	for k, v := range perm.OperationPermissions {
 		opPerms[strings.ToLower(k)] = v
 	}
 
-	for label := range labelsFound {
+	for label := range listener.labelsFound {
 		if perms, ok := opPerms[label]; ok {
 			log.Printf("For label '%s': operation '%s', permission read=%v\n", label, operation, perms.Read)
 			var allowed bool
@@ -180,7 +180,7 @@ func (analyzer *RegexAnalyzer) analyzeQuery(cypher string, perm *postgres.Permis
 	return analysis, nil
 }
 
-func (r *RegexAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (string, bool, error) {
+func (p *ParserAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (string, bool, error) {
 	log.Println("Attempting to rewrite the query. Violations:", analysis.Violations)
 
 	// Determine if there are any violations other than disallowed properties
@@ -190,11 +190,10 @@ func (r *RegexAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (s
 		if !strings.HasPrefix(v, "disallowed property") {
 			nonPropertyViolations = true
 			break
-		} else {
-			parts := strings.Split(v, "'")
-			if len(parts) >= 2 {
-				disallowedProps = append(disallowedProps, parts[1])
-			}
+		}
+		parts := strings.Split(v, "'")
+		if len(parts) >= 2 {
+			disallowedProps = append(disallowedProps, parts[1])
 		}
 	}
 
@@ -221,23 +220,23 @@ func (r *RegexAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (s
 	// Split the RETURN clause into individual fields
 	fields := strings.Split(originalReturnClause, ",")
 	var allowedFields []string
-
-fieldLoop:
 	for _, field := range fields {
 		trimmed := strings.TrimSpace(field)
+		skip := false
 
 		// Skip fields that reference any disallowed property
 		for _, prop := range disallowedProps {
 			if strings.Contains(strings.ToLower(trimmed), "."+strings.ToLower(prop)) {
-				log.Printf("Removing field '%s' due to disallowed property '%s'\n", trimmed, prop)
-				continue fieldLoop
+				skip = true
+				break
 			}
 		}
-		allowedFields = append(allowedFields, trimmed)
+		if !skip {
+			allowedFields = append(allowedFields, trimmed)
+		}
 	}
 
 	if len(allowedFields) == 0 {
-		log.Println("Rewriting fails due to resulting in an empty RETURN clause")
 		return "", false, fmt.Errorf("Cannot safely rewrite the query")
 	}
 
@@ -250,9 +249,9 @@ fieldLoop:
 	return rewrittenQuery, true, nil // 'true' indicates a rewritten query was returned
 }
 
-func (r *RegexAnalyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, []string, error) {
-	log.Println("Analyzing with Regex Analyzer...")
-	analysis, err := r.analyzeQuery(cypher, perm)
+func (p *ParserAnalyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissions) ([]map[string]any, bool, string, []string, error) {
+	log.Println("Analyzing with Parser Analyzer...")
+	analysis, err := p.analyzeQuery(cypher, perm)
 	if err != nil {
 		return nil, false, "", nil, err
 	}
@@ -260,25 +259,25 @@ func (r *RegexAnalyzer) AnalyzeAndExecute(cypher string, perm *postgres.Permissi
 	// Execute the query if it passed analysis
 	if analysis.Allowed {
 		log.Println("Query deemed safe. Executing original query...")
-		results, err := graphdb.QueryHandler(r.Ctx, r.Driver, cypher)
+		results, err := graphdb.QueryHandler(p.Ctx, p.Driver, cypher)
 		if err != nil {
-			return nil, false, "", analysis.Violations, fmt.Errorf("%s", err.Error())
+			return nil, false, "", analysis.Violations, err
 		}
 		return results, false, "", analysis.Violations, nil
 	}
 
 	// Otherwise attempt to rewrite the query
 	log.Println("Query is unsafe. Attempting to rewrite...")
-	rewrittenQuery, wasRewritten, err := r.rewriteQuery(cypher, analysis)
+	rewritten, wasRewritten, err := p.rewriteQuery(cypher, analysis)
 	if err != nil {
-		return nil, wasRewritten, rewrittenQuery, analysis.Violations, analyzer.ForbiddenQueryErr
+		return nil, wasRewritten, rewritten, analysis.Violations, analyzer.ForbiddenQueryErr
 	}
 
 	log.Println("Rewritten query accepted. Executing rewritten query...")
-	results, err := graphdb.QueryHandler(r.Ctx, r.Driver, rewrittenQuery)
+	results, err := graphdb.QueryHandler(p.Ctx, p.Driver, rewritten)
 	if err != nil {
-		return nil, wasRewritten, rewrittenQuery, analysis.Violations, fmt.Errorf("%s", err.Error())
+		return nil, wasRewritten, rewritten, analysis.Violations, err
 	}
 
-	return results, wasRewritten, rewrittenQuery, analysis.Violations, nil
+	return results, wasRewritten, rewritten, analysis.Violations, nil
 }

@@ -283,6 +283,7 @@ func (p *ParserAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (
 		// Skip fields that reference any disallowed property
 		for _, prop := range disallowedProps {
 			if strings.Contains(strings.ToLower(trimmed), "."+strings.ToLower(prop)) {
+				log.Printf("Removing field '%s' due to disallowed property '%s'\n", trimmed, prop)
 				skip = true
 				break
 			}
@@ -293,6 +294,7 @@ func (p *ParserAnalyzer) rewriteQuery(cypher string, analysis *AnalysisResult) (
 	}
 
 	if len(allowedFields) == 0 {
+		log.Println("Rewriting fails due to resulting in an empty RETURN clause")
 		return "", false, fmt.Errorf("Cannot safely rewrite the query")
 	}
 

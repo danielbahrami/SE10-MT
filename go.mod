@@ -1,6 +1,6 @@
 module github.com/danielbahrami/se10-mt
 
-go 1.24.2
+go 1.24.3
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
@@ -10,7 +10,7 @@ require (
 
 require (
 	github.com/stretchr/testify v1.10.0 // indirect
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
+	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 )
 
 require (

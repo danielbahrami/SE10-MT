@@ -4,13 +4,13 @@ go 1.24.3
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
-	github.com/jackc/pgx/v5 v5.7.4
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.1
 )
 
 require (
 	github.com/stretchr/testify v1.10.0 // indirect
-	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
+	golang.org/x/exp v0.0.0-20250531010427-b6e5de432a8b // indirect
 )
 
 require (
